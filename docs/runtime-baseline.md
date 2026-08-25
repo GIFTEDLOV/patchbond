@@ -13,7 +13,7 @@ Verified on 2026-08-25 before implementation. No package was upgraded.
 | Python | 3.14 runtime | Kept |
 | CLI active network | `testnet-bradbury` | Read-only inspection only; no deployment |
 
-The Direct runner resolved its cached contract SDK to GenVM `v0.2.16`. The contract dependency is pinned to the current official documentation value:
+The contract dependency is pinned to the current official documentation value:
 
 ```python
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
@@ -73,6 +73,8 @@ GLSim is production-shaped, not full GenVM. Version 0.29.2 also needs a test-onl
 
 The published 0.29.2 Windows wheel also attempts to unlink a temporary file immediately after rebinding it to stdin, which Windows rejects. The pre-existing installed copy already deferred that unlink. `tests/conftest.py` carries the same narrow Windows-only deferred cleanup so a fresh virtual environment is reproducible; Linux CI takes no compatibility path.
 
-Direct and GLSim are explicitly pinned to `GENVM_VERSION=v0.2.16`; otherwise Direct selects the newest cached bundle and its behavior changes after validation downloads. The `genvm-lint` steps override that pin with `v0.3.0-rc7`, the verified bundle containing the contract dependency. This split prevents an encoder/decoder mismatch and removes cache-order dependence.
+GLSim is explicitly pinned to `GENVM_VERSION=v0.2.16`; `genvm-lint` uses `v0.3.0-rc7`, the verified bundle containing the contract dependency. The published `genlayer-test==0.29.2` Direct resolver maps the contract's exact runner hash to `v0.3.0-rc7`, irrespective of the job-level fallback. This removes cache-order dependence while preserving the immutable contract dependency.
+
+The first exact-head CI run exposed an upstream packaging compatibility defect before any Direct assertion executed: the locked wheel requested the retired `genvm-universal.tar.xz` filename, while the official `v0.3.0-rc7` release publishes the same runner archive as `genvm-runners-all.tar.xz`. CI now downloads that official asset into the filename expected by the locked wheel and verifies the release API's SHA-256, `e218a1854214681560351051f76fe2b878545cf3409455ef372d57014a88ca67`, before Direct can use it. A missing or altered asset fails closed. No package or contract version was changed.
 
 During the clean gate, the global installation (still labeled 0.29.2) was found to contain a different SDK-compat loader than the published 0.29.2 wheel. That global loader cannot encode messages for the pinned Direct bundle after rc7 enters its cache. Release results therefore come from a newly created isolated environment installed from `requirements-dev.txt`, matching CI, rather than from undeclared global package contents. No global package was upgraded or used to claim the final Direct/GLSim result.

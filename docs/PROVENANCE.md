@@ -11,6 +11,6 @@
 
 Verify the source record with `python tools/source_hash.py`. The CI workflow checks the event SHA, this digest, all tests, mutation guards, GLSim consensus proof, GenVM lint/validation, secrets, and a clean generated state.
 
-Release test authority is a fresh isolated install from `requirements-dev.txt`. Direct/GLSim use `GENVM_VERSION=v0.2.16`; GenVM lint/validation override it with `v0.3.0-rc7`.
+Release test authority is a fresh isolated install from `requirements-dev.txt`. GLSim uses `GENVM_VERSION=v0.2.16`; Direct resolves the contract's immutable runner hash to `v0.3.0-rc7`; GenVM lint/validation also use `v0.3.0-rc7`. CI verifies the official `genvm-runners-all.tar.xz` asset as SHA-256 `e218a1854214681560351051f76fe2b878545cf3409455ef372d57014a88ca67` before exposing it under the compatibility cache name required by the locked Direct runner.
 
 Stage 2 did not deploy or broadcast to Bradbury, did not use Studionet, and did not request or access a private key.

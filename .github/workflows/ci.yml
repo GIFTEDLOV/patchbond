@@ -41,6 +41,17 @@ jobs:
       - name: Pure deterministic tests
         run: python -m pytest -q tests/test_core.py
 
+      - name: Cache verified GenVM runner bundle for Direct
+        shell: bash
+        run: |
+          GLTEST_CACHE_DIR="$(python -c 'from pathlib import Path; print(Path.home() / ".cache" / "gltest-direct")')"
+          mkdir -p "$GLTEST_CACHE_DIR"
+          curl --fail --location --retry 3 \
+            https://github.com/genlayerlabs/genvm/releases/download/v0.3.0-rc7/genvm-runners-all.tar.xz \
+            --output "$GLTEST_CACHE_DIR/genvm-universal-v0.3.0-rc7.tar.xz"
+          echo "e218a1854214681560351051f76fe2b878545cf3409455ef372d57014a88ca67  $GLTEST_CACHE_DIR/genvm-universal-v0.3.0-rc7.tar.xz" \
+            | sha256sum --check --strict
+
       - name: Direct contract tests
         run: python -m pytest -q tests/test_direct_contract.py
 
