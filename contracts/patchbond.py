@@ -154,6 +154,16 @@ def checked_deadline(start: int, duration: int) -> int:
     return deadline
 
 
+def deadline_window_open(now_seconds: int, deadline_seconds: int) -> bool:
+    require(type(now_seconds) is int and type(deadline_seconds) is int, "invalid deadline")
+    require(now_seconds >= 0 and deadline_seconds >= 0, "invalid deadline")
+    return now_seconds <= deadline_seconds
+
+
+def deadline_expired(now_seconds: int, deadline_seconds: int) -> bool:
+    return not deadline_window_open(now_seconds, deadline_seconds)
+
+
 def authorize_settlement(bounty: int, settled: int, liability: int, authorized: int) -> tuple[int, int, int]:
     require(bounty > 0 and settled == 0 and liability >= bounty, "invalid or duplicate settlement")
     return bounty, liability - bounty, authorized + bounty
@@ -335,9 +345,11 @@ class PatchBondEscrow(gl.Contract):
         url = "https://api.github.com/repos/" + owner + "/" + repo
         data = self._http_json(url)
         expected = owner + "/" + repo
+        full_name = data.get("full_name") if type(data) is dict else None
         if (
             type(data) is not dict
-            or data.get("full_name", "").lower() != expected
+            or type(full_name) is not str
+            or full_name.lower() != expected
             or type(data.get("id")) is not int
             or data["id"] <= 0
         ):
@@ -531,7 +543,7 @@ class PatchBondEscrow(gl.Contract):
         if self.case_status[case_id] != STATUS_PROVISIONAL_FIXED:
             raise gl.vm.UserError("NOT_PROVISIONAL")
         now = self._now()
-        if now > int(self.case_challenge_deadline[case_id]):
+        if deadline_expired(now, int(self.case_challenge_deadline[case_id])):
             raise gl.vm.UserError("CHALLENGE_DEADLINE_PASSED")
         try:
             validate_commit_sha(challenge_commit_sha)
@@ -553,7 +565,7 @@ class PatchBondEscrow(gl.Contract):
             try:
                 own = self._challenge_evidence_memory(owner, repo, patch_sha, challenge_commit_sha, challenge_path)
                 proposed = leader_result.calldata
-                return type(proposed) is dict and proposed.get("digest") == own["digest"] and proposed.get("content") == own["content"]
+                return type(proposed) is dict and set(proposed.keys()) == {"digest", "content"} and proposed == own
             except Exception:
                 return False
 
@@ -608,7 +620,7 @@ class PatchBondEscrow(gl.Contract):
         if self.case_status[case_id] != STATUS_CHALLENGED:
             raise gl.vm.UserError("NOT_CHALLENGED")
         now = self._now()
-        if now > int(self.case_response_deadline[case_id]):
+        if deadline_expired(now, int(self.case_response_deadline[case_id])):
             raise gl.vm.UserError("RESPONSE_DEADLINE_PASSED")
         try:
             validate_commit_sha(response_patch_sha)
@@ -680,7 +692,7 @@ class PatchBondEscrow(gl.Contract):
         self._require_case(case_id)
         if self.case_status[case_id] != STATUS_PROVISIONAL_FIXED:
             raise gl.vm.UserError("NOT_PROVISIONAL")
-        if self._now() <= int(self.case_challenge_deadline[case_id]):
+        if deadline_window_open(self._now(), int(self.case_challenge_deadline[case_id])):
             raise gl.vm.UserError("CHALLENGE_WINDOW_ACTIVE")
         self.case_status[case_id] = STATUS_FINALIZED_DEVELOPER
         self._authorize_and_emit(case_id, self.case_terms[case_id].developer)
@@ -690,7 +702,7 @@ class PatchBondEscrow(gl.Contract):
         self._require_case(case_id)
         if self.case_status[case_id] != STATUS_CHALLENGED:
             raise gl.vm.UserError("NOT_CHALLENGED")
-        if self._now() <= int(self.case_response_deadline[case_id]):
+        if deadline_window_open(self._now(), int(self.case_response_deadline[case_id])):
             raise gl.vm.UserError("RESPONSE_WINDOW_ACTIVE")
         self.case_status[case_id] = STATUS_FINALIZED_CLIENT
         self._authorize_and_emit(case_id, self.case_terms[case_id].client)

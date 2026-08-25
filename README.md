@@ -29,8 +29,11 @@ Consensus proves agreement about interpretation; it does not authenticate eviden
 - [`contracts/patchbond_core.py`](contracts/patchbond_core.py) — pure reference layer for validation, canonical serialization, digests, transitions, deadlines, and accounting.
 - [`contracts/patchbond.py`](contracts/patchbond.py) — self-contained deployable multi-case `PatchBondEscrow`; GenVM deploys a single source file, so its deterministic primitives mirror the pure reference layer.
 - [`tests`](tests) — pure adversarial tests and GenLayer Direct-mode contract/consensus tests.
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — exact-head, fail-closed Stage 2 gates.
 - [`docs/runtime-baseline.md`](docs/runtime-baseline.md) — official-runtime verification and read-only endpoint probes.
 - [`docs/security.md`](docs/security.md) — bounds, trust model, schema, and invariants.
+- [`docs/security-model.md`](docs/security-model.md) — Stage 2 audit, threat model, consensus proof, and settlement limits.
+- [`docs/PROVENANCE.md`](docs/PROVENANCE.md) — exact deployable source digest and locked validation baseline.
 
 ## Use
 
@@ -39,8 +42,11 @@ Run the local gates:
 ```powershell
 python -m pytest -q
 python tools/mutation_test.py
+python -m pytest -q tests/test_glsim_consensus.py
 python tools/secret_scan.py
+python tools/source_hash.py
 genvm-lint check contracts/patchbond.py
+genvm-lint validate contracts/patchbond.py
 git diff --check
 ```
 
@@ -55,6 +61,7 @@ Public writes are `create_case`, `accept_case`, `submit_patch`, `challenge`, `re
 Participants never supply evidence URLs. The contract constructs only `https://api.github.com/repos/{owner}/{repo}/...` URLs from immutable validated terms. GitHub repository/commit provenance is verified before semantic use. Challenge evidence is authenticated to the same repository and commit lineage but remains untrusted participant-authored content until adjudicated. Frontends and backends have no verdict, challenge-persuasion, entitlement, refund, or payout authority.
 
 See [docs/security.md](docs/security.md) for the complete sequence and bounds.
+See [docs/security-model.md](docs/security-model.md) for the Stage 2 adversarial review and five-validator proof.
 
 ## Limitations
 
@@ -64,6 +71,7 @@ See [docs/security.md](docs/security.md) for the complete sequence and bounds.
 - Repository deletion, visibility changes, GitHub outage, model failure, or consensus failure reverts/fails; none becomes a party win.
 - A case that never reaches provisional `FIXED` remains funded in V1; there is intentionally no unilateral cancellation or refund path.
 - External transfers must be reconciled after transaction finality and successful execution.
+- GLSim is production-shaped, not a full GenVM or live-network compatibility claim; its 0.29.2 rollback inspection limitation is documented.
 - No frontend exists yet.
 
 ## Developer/API detail

@@ -18,6 +18,8 @@ from contracts.patchbond_core import (
     canonical_json,
     challenge_next_status,
     checked_deadline,
+    deadline_expired,
+    deadline_window_open,
     evidence_manifest_digest,
     git_blob_sha,
     parse_verdict,
@@ -159,6 +161,15 @@ def test_deadline_arithmetic_rejects_overflow():
     assert checked_deadline(100, 20) == 120
     with pytest.raises(PatchBondValidationError, match="overflow"):
         checked_deadline((1 << 64) - 1, 1)
+
+
+@pytest.mark.parametrize(
+    "now,open_expected,expired_expected",
+    [(999, True, False), (1000, True, False), (1001, False, True)],
+)
+def test_deadline_is_inclusive_for_participant_and_strict_for_settlement(now, open_expected, expired_expected):
+    assert deadline_window_open(now, 1000) is open_expected
+    assert deadline_expired(now, 1000) is expired_expected
 
 
 def test_settlement_arithmetic_is_single_use_and_conserves_credit():

@@ -197,6 +197,18 @@ def checked_deadline(start_seconds: int, duration_seconds: int, maximum: int = (
     return deadline
 
 
+def deadline_window_open(now_seconds: int, deadline_seconds: int) -> bool:
+    """Return whether an inclusive participant action window is still open."""
+    require(type(now_seconds) is int and type(deadline_seconds) is int, "deadline values must be integers")
+    require(now_seconds >= 0 and deadline_seconds >= 0, "deadline values must be nonnegative")
+    return now_seconds <= deadline_seconds
+
+
+def deadline_expired(now_seconds: int, deadline_seconds: int) -> bool:
+    """Return whether settlement is permitted strictly after an inclusive window."""
+    return not deadline_window_open(now_seconds, deadline_seconds)
+
+
 def authorize_settlement(
     bounty: int,
     settlement_amount: int,

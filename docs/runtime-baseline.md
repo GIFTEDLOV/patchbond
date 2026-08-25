@@ -62,3 +62,17 @@ Not used for V1. The exact-commit public check-runs probe did not complete relia
 ## Compatibility claim
 
 Bradbury compatibility is **not claimed**. No key was accessed and nothing was deployed. Direct execution and local lint/validation results are reported separately from live-network proof.
+
+## Stage 2 local consensus baseline
+
+Official current testing guidance distinguishes Direct Mode from production consensus and documents GLSim as a lightweight local multi-validator network. The installed `genlayer-test[sim]` 0.29.2 provides `python -m glsim --validators 5`; PatchBond uses its consensus engine directly with exact local web/model fixtures so no account key or external service is required.
+
+The representative proof runs one leader derivation and five independent validator derivations. Five agreeing votes finalize and store `FIXED` as `PROVISIONAL_FIXED`; a forced disagreement produces five disagreeing votes and restores the captured pre-consensus storage snapshot. Repeating the agreeing fixture produces identical case, accounting, verdict, and digest state.
+
+GLSim is production-shaped, not full GenVM. Version 0.29.2 also needs a test-only manager rebind to inspect a restored contract after disagreement; the raw restored snapshot is verified first. This exact limitation is documented in `docs/security-model.md`. No package was upgraded, no Studionet was used, and no Bradbury transaction was broadcast.
+
+The published 0.29.2 Windows wheel also attempts to unlink a temporary file immediately after rebinding it to stdin, which Windows rejects. The pre-existing installed copy already deferred that unlink. `tests/conftest.py` carries the same narrow Windows-only deferred cleanup so a fresh virtual environment is reproducible; Linux CI takes no compatibility path.
+
+Direct and GLSim are explicitly pinned to `GENVM_VERSION=v0.2.16`; otherwise Direct selects the newest cached bundle and its behavior changes after validation downloads. The `genvm-lint` steps override that pin with `v0.3.0-rc7`, the verified bundle containing the contract dependency. This split prevents an encoder/decoder mismatch and removes cache-order dependence.
+
+During the clean gate, the global installation (still labeled 0.29.2) was found to contain a different SDK-compat loader than the published 0.29.2 wheel. That global loader cannot encode messages for the pinned Direct bundle after rc7 enters its cache. Release results therefore come from a newly created isolated environment installed from `requirements-dev.txt`, matching CI, rather than from undeclared global package contents. No global package was upgraded or used to claim the final Direct/GLSim result.

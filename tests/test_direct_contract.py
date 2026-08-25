@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+from datetime import datetime, timezone
 
 import pytest
 
@@ -41,6 +42,17 @@ def _commit_body(sha: str):
 
 def _compare_body(base: str):
     return json.dumps({"status": "ahead", "merge_base_commit": {"sha": base}})
+
+
+def _warp_epoch(direct_vm, epoch_seconds: int) -> None:
+    instant = datetime.fromtimestamp(epoch_seconds, timezone.utc).isoformat().replace("+00:00", "Z")
+    direct_vm.warp(instant)
+
+
+def _drop_web_mock(direct_vm, url_fragment: str) -> None:
+    direct_vm._web_mocks = [
+        pair for pair in direct_vm._web_mocks if url_fragment not in pair[0].pattern.replace("\\", "")
+    ]
 
 
 def _mock_submission(
@@ -385,3 +397,287 @@ def test_multiple_cases_are_isolated(direct_vm, direct_deploy, direct_alice, dir
     assert contract.get_case("case-a")["developer_address"].lower() == _hex(direct_bob).lower()
     assert contract.get_case("case-b")["developer_address"].lower() == _hex(direct_charlie).lower()
     assert contract.get_accounting() == {"total_received": 350, "open_liability": 350, "total_authorized": 0}
+
+
+@pytest.mark.parametrize("offset,allowed", [(-1, True), (0, True), (1, False)])
+def test_challenge_deadline_exact_boundary(
+    direct_vm, direct_deploy, direct_alice, direct_bob, offset, allowed
+):
+    contract = _deploy_case(direct_vm, direct_deploy, direct_alice, direct_bob)
+    with direct_vm.prank(direct_bob):
+        contract.accept_case("case-1")
+    _mock_submission(direct_vm)
+    with direct_vm.prank(direct_bob):
+        contract.submit_patch("case-1", PATCH)
+    deadline = contract.get_case("case-1")["challenge_deadline"]
+    _warp_epoch(direct_vm, deadline + offset)
+    direct_vm.clear_mocks()
+    _mock_challenge(direct_vm)
+    if allowed:
+        with direct_vm.prank(direct_alice):
+            contract.challenge("case-1", CHALLENGE, CHALLENGE_PATH)
+        assert contract.get_case("case-1")["status"] == "CHALLENGED"
+    else:
+        with direct_vm.prank(direct_alice), direct_vm.expect_revert("CHALLENGE_DEADLINE_PASSED"):
+            contract.challenge("case-1", CHALLENGE, CHALLENGE_PATH)
+        assert contract.get_case("case-1")["status"] == "PROVISIONAL_FIXED"
+
+
+@pytest.mark.parametrize("offset,allowed", [(-1, False), (0, False), (1, True)])
+def test_uncontested_finalization_exact_boundary(
+    direct_vm, direct_deploy, direct_alice, direct_bob, offset, allowed
+):
+    contract = _deploy_case(direct_vm, direct_deploy, direct_alice, direct_bob)
+    with direct_vm.prank(direct_bob):
+        contract.accept_case("case-1")
+    _mock_submission(direct_vm)
+    with direct_vm.prank(direct_bob):
+        contract.submit_patch("case-1", PATCH)
+    deadline = contract.get_case("case-1")["challenge_deadline"]
+    _warp_epoch(direct_vm, deadline + offset)
+    direct_vm._gl_call_hook = lambda _vm, _request: {"ok": None}
+    if allowed:
+        contract.finalize_uncontested("case-1")
+        assert contract.get_case("case-1")["status"] == "FINALIZED_DEVELOPER"
+    else:
+        with direct_vm.expect_revert("CHALLENGE_WINDOW_ACTIVE"):
+            contract.finalize_uncontested("case-1")
+        assert contract.get_case("case-1")["settlement_amount"] == 0
+
+
+@pytest.mark.parametrize("offset,allowed", [(-1, True), (0, True), (1, False)])
+def test_response_deadline_exact_boundary(
+    direct_vm, direct_deploy, direct_alice, direct_bob, offset, allowed
+):
+    contract = _provisional_then_challenged(direct_vm, direct_deploy, direct_alice, direct_bob)
+    deadline = contract.get_case("case-1")["response_deadline"]
+    _warp_epoch(direct_vm, deadline + offset)
+    _mock_response(direct_vm, verdict="INCONCLUSIVE")
+    if allowed:
+        with direct_vm.prank(direct_bob):
+            contract.respond_to_challenge("case-1", RESPONSE)
+        assert contract.get_case("case-1")["status"] == "CHALLENGED"
+        assert contract.get_case("case-1")["settlement_amount"] == 0
+    else:
+        with direct_vm.prank(direct_bob), direct_vm.expect_revert("RESPONSE_DEADLINE_PASSED"):
+            contract.respond_to_challenge("case-1", RESPONSE)
+
+
+@pytest.mark.parametrize("offset,allowed", [(-1, False), (0, False), (1, True)])
+def test_client_timeout_refund_exact_boundary(
+    direct_vm, direct_deploy, direct_alice, direct_bob, offset, allowed
+):
+    contract = _provisional_then_challenged(direct_vm, direct_deploy, direct_alice, direct_bob)
+    deadline = contract.get_case("case-1")["response_deadline"]
+    _warp_epoch(direct_vm, deadline + offset)
+    direct_vm._gl_call_hook = lambda _vm, _request: {"ok": None}
+    if allowed:
+        contract.authorize_client_refund("case-1")
+        assert contract.get_case("case-1")["status"] == "FINALIZED_CLIENT"
+    else:
+        with direct_vm.expect_revert("RESPONSE_WINDOW_ACTIVE"):
+            contract.authorize_client_refund("case-1")
+        assert contract.get_case("case-1")["settlement_amount"] == 0
+
+
+@pytest.mark.parametrize(
+    "failure_kind,error",
+    [
+        ("wrong_repo", "REPOSITORY_IDENTITY"),
+        ("symlink", "CONTENT_SHAPE"),
+        ("oversized", "CONTENT_SIZE"),
+        ("invalid_utf8", "CONTENT_NOT_TEXT"),
+        ("unavailable", "HTTP_404"),
+    ],
+)
+def test_malformed_challenge_evidence_fails_without_state_change(
+    direct_vm, direct_deploy, direct_alice, direct_bob, failure_kind, error
+):
+    contract = _deploy_case(direct_vm, direct_deploy, direct_alice, direct_bob)
+    with direct_vm.prank(direct_bob):
+        contract.accept_case("case-1")
+    _mock_submission(direct_vm)
+    with direct_vm.prank(direct_bob):
+        contract.submit_patch("case-1", PATCH)
+    direct_vm.clear_mocks()
+    _mock_challenge(direct_vm)
+    if failure_kind == "wrong_repo":
+        _drop_web_mock(direct_vm, "/repos/owner/repo$")
+        direct_vm.mock_web(
+            r"/repos/owner/repo$",
+            {"status": 200, "body": json.dumps({"id": 123, "full_name": 7})},
+        )
+    else:
+        _drop_web_mock(direct_vm, f"/contents/{CHALLENGE_PATH}?ref={CHALLENGE}$")
+        pattern = rf"/contents/{re_escape(CHALLENGE_PATH)}\?ref={CHALLENGE}$"
+        if failure_kind == "symlink":
+            body = json.dumps({"type": "symlink", "encoding": "base64", "size": 0, "content": "", "sha": ""})
+            direct_vm.mock_web(pattern, {"status": 200, "body": body})
+        elif failure_kind == "oversized":
+            body = json.dumps({"type": "file", "encoding": "base64", "size": 16_385, "content": "", "sha": ""})
+            direct_vm.mock_web(pattern, {"status": 200, "body": body})
+        elif failure_kind == "invalid_utf8":
+            raw = b"\xff"
+            body = json.dumps({
+                "type": "file", "encoding": "base64", "size": 1,
+                "content": base64.b64encode(raw).decode(), "sha": _blob_sha(raw),
+            })
+            direct_vm.mock_web(pattern, {"status": 200, "body": body})
+        else:
+            direct_vm.mock_web(pattern, {"status": 404, "body": "{}"})
+    with direct_vm.prank(direct_alice), direct_vm.expect_revert(error):
+        contract.challenge("case-1", CHALLENGE, CHALLENGE_PATH)
+    case = contract.get_case("case-1")
+    assert case["status"] == "PROVISIONAL_FIXED"
+    assert case["challenge_evidence_digest"] == ""
+    assert case["settlement_amount"] == 0
+
+
+def test_technical_response_failure_is_not_client_victory(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = _provisional_then_challenged(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _mock_response(direct_vm)
+    direct_vm._llm_mocks.clear()
+
+    def fail_model(_request):
+        raise RuntimeError("provider unavailable")
+
+    direct_vm._live_llm_handler = fail_model
+    with direct_vm.prank(direct_bob), direct_vm.expect_revert("MODEL_FAILURE"):
+        contract.respond_to_challenge("case-1", RESPONSE)
+    case = contract.get_case("case-1")
+    assert case["status"] == "CHALLENGED"
+    assert case["settlement_amount"] == 0
+    assert contract.get_accounting() == {"total_received": 100, "open_liability": 100, "total_authorized": 0}
+
+    _warp_epoch(direct_vm, case["response_deadline"] + 1)
+    direct_vm._gl_call_hook = lambda _vm, _request: {"ok": None}
+    contract.authorize_client_refund("case-1")
+    assert contract.get_case("case-1")["status"] == "FINALIZED_CLIENT"
+
+
+def test_challenge_and_response_cannot_mutate_original_terms(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = _deploy_case(direct_vm, direct_deploy, direct_alice, direct_bob, bounty=137)
+    with direct_vm.prank(direct_bob):
+        contract.accept_case("case-1")
+    _mock_submission(direct_vm)
+    with direct_vm.prank(direct_bob):
+        contract.submit_patch("case-1", PATCH)
+    immutable_keys = (
+        "client_address", "developer_address", "repo_owner", "repo_name", "base_commit_sha",
+        "vulnerability_spec", "acceptance_criteria", "review_paths", "bounty_amount",
+        "challenge_window_seconds",
+    )
+    before = {key: contract.get_case("case-1")[key] for key in immutable_keys}
+    direct_vm.clear_mocks()
+    _mock_challenge(direct_vm)
+    with direct_vm.prank(direct_alice):
+        contract.challenge("case-1", CHALLENGE, CHALLENGE_PATH)
+    assert {key: contract.get_case("case-1")[key] for key in immutable_keys} == before
+    direct_vm.clear_mocks()
+    _mock_response(direct_vm, verdict="INCONCLUSIVE")
+    with direct_vm.prank(direct_bob):
+        contract.respond_to_challenge("case-1", RESPONSE)
+    assert {key: contract.get_case("case-1")[key] for key in immutable_keys} == before
+
+
+def test_settlement_is_single_case_exact_bounty_and_correct_recipient(
+    direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie
+):
+    contract = _deploy_case(direct_vm, direct_deploy, direct_alice, direct_bob, "case-a", 100)
+    direct_vm.sender = direct_alice
+    direct_vm.value = 250
+    contract.create_case(
+        "case-b", _hex(direct_charlie), "owner", "repo", BASE,
+        "Second vulnerability.", "Second acceptance criterion.", [PATH], 7200,
+    )
+    direct_vm.value = 0
+    with direct_vm.prank(direct_bob):
+        contract.accept_case("case-a")
+    _mock_submission(direct_vm)
+    with direct_vm.prank(direct_bob):
+        contract.submit_patch("case-a", PATCH)
+    deadline = contract.get_case("case-a")["challenge_deadline"]
+    _warp_epoch(direct_vm, deadline + 1)
+    direct_vm._gl_call_hook = lambda _vm, _request: {"ok": None}
+    contract.finalize_uncontested("case-a")
+
+    case_a = contract.get_case("case-a")
+    case_b = contract.get_case("case-b")
+    assert case_a["settlement_recipient"].lower() == _hex(direct_bob).lower()
+    assert case_a["settlement_amount"] == 100
+    assert case_b["settlement_recipient"].lower() == "0x" + "0" * 40
+    assert case_b["settlement_amount"] == 0
+    assert case_b["bounty_amount"] == 250
+    assert contract.get_accounting() == {"total_received": 350, "open_liability": 250, "total_authorized": 100}
+    with direct_vm.expect_revert("NOT_PROVISIONAL"):
+        contract.finalize_uncontested("case-a")
+
+
+@pytest.mark.parametrize("failure_kind,error", [("repository", "REPOSITORY_IDENTITY"), ("web", "HTTP_503")])
+def test_response_evidence_failure_is_not_client_victory(
+    direct_vm, direct_deploy, direct_alice, direct_bob, failure_kind, error
+):
+    contract = _provisional_then_challenged(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _mock_response(direct_vm)
+    if failure_kind == "repository":
+        _drop_web_mock(direct_vm, "/repos/owner/repo$")
+        direct_vm.mock_web(
+            r"/repos/owner/repo$",
+            {"status": 200, "body": json.dumps({"id": 999, "full_name": "other/repo"})},
+        )
+    else:
+        direct_vm.clear_mocks()
+        direct_vm.mock_web(r".*", {"status": 503, "body": "{}"})
+    with direct_vm.prank(direct_bob), direct_vm.expect_revert(error):
+        contract.respond_to_challenge("case-1", RESPONSE)
+    case = contract.get_case("case-1")
+    assert case["status"] == "CHALLENGED"
+    assert case["active_submission_id"] == "case-1:1"
+    assert case["settlement_amount"] == 0
+    assert contract.get_accounting() == {"total_received": 100, "open_liability": 100, "total_authorized": 0}
+
+
+def test_failed_transfer_authorization_reverts_terminal_state_and_accounting(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = _deploy_case(direct_vm, direct_deploy, direct_alice, direct_bob)
+    with direct_vm.prank(direct_bob):
+        contract.accept_case("case-1")
+    _mock_submission(direct_vm)
+    with direct_vm.prank(direct_bob):
+        contract.submit_patch("case-1", PATCH)
+    case = contract.get_case("case-1")
+    _warp_epoch(direct_vm, case["challenge_deadline"] + 1)
+
+    def fail_transfer(_vm, _request):
+        raise RuntimeError("transfer authorization failed")
+
+    direct_vm._gl_call_hook = fail_transfer
+    snapshot = direct_vm.snapshot()
+    with direct_vm.expect_revert("transfer authorization failed"):
+        contract.finalize_uncontested("case-1")
+    # Direct verifies the exception but does not auto-rollback. Restore its
+    # explicit snapshot to model GenVM transaction atomicity before assertions.
+    direct_vm.revert(snapshot)
+    case = contract.get_case("case-1")
+    assert case["status"] == "PROVISIONAL_FIXED"
+    assert case["settlement_status"] == "NONE"
+    assert case["settlement_amount"] == 0
+    assert contract.get_accounting() == {"total_received": 100, "open_liability": 100, "total_authorized": 0}
+
+
+def test_duplicate_client_timeout_settlement_is_impossible(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    contract = _provisional_then_challenged(direct_vm, direct_deploy, direct_alice, direct_bob)
+    case = contract.get_case("case-1")
+    _warp_epoch(direct_vm, case["response_deadline"] + 1)
+    direct_vm._gl_call_hook = lambda _vm, _request: {"ok": None}
+    contract.authorize_client_refund("case-1")
+    with direct_vm.expect_revert("NOT_CHALLENGED"):
+        contract.authorize_client_refund("case-1")
+    assert contract.get_accounting() == {"total_received": 100, "open_liability": 0, "total_authorized": 100}
