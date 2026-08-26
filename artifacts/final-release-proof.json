@@ -9,6 +9,7 @@
   "contract_source_path": "contracts/patchbond.py",
   "contract_sha256": "910c386667333ebc9bc88b58031889c24b406063e6087deb6e8f6f77eacccbf3",
   "deployable_sha256": "910c386667333ebc9bc88b58031889c24b406063e6087deb6e8f6f77eacccbf3",
+  "repository_head_before_vercel_closeout": "fc65a69c3041fb2daed42391a24b3759c9306650",
   "runner_hash": "1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6",
   "runner_compatibility": {
     "genvm_bundle": "v0.3.0-rc7",
@@ -100,10 +101,24 @@
     "open_liability": "0",
     "total_authorized": "10000000000000000"
   },
+  "vercel_project_id": "prj_1AnPbBDGvGYJDS0Ijso0rL6H3uhp",
   "vercel_project": "patchbond",
-  "vercel_url": null,
-  "vercel_status": "BLOCKED_NO_AUTHENTICATED_ACCOUNT",
-  "live_routes": [],
+  "vercel_url": "https://patchbond.vercel.app",
+  "vercel_status": "READY",
+  "vercel_deployment_id": "dpl_3jRNjd8VsGrWrcJ4HiH21TqnFrxV",
+  "vercel_deployment_url": "https://patchbond-lim3gcbj0-kolofahkelvin16-6437s-projects.vercel.app",
+  "live_routes": [
+    {"path": "/", "status": 200},
+    {"path": "/cases/new", "status": 200},
+    {"path": "/cases/stage4-commitgate-20260826d", "status": 200},
+    {"path": "/developer", "status": 200},
+    {"path": "/verify/stage4-commitgate-20260826d", "status": 200}
+  ],
+  "public_frontend_configuration": {
+    "rpc": "https://rpc-bradbury.genlayer.com",
+    "chain_id": 4221,
+    "contract_address": "0x31fAeeb4C21fBDceeE2EF77BF75145ABC7931834"
+  },
   "ci_run": 32987441346,
   "ci_head": "c19234bd762117015e0b19ae6d8bf74cec8a4f2b",
   "ci_result": "SUCCESS",
@@ -150,7 +165,7 @@
   ],
   "limitations": [
     "Bradbury proof is production-like testnet evidence, not mainnet deployment.",
-    "The dedicated Vercel deployment remains blocked on external Vercel authentication; no credentials were requested or exposed.",
+    "The hosted frontend is deployed on Vercel at https://patchbond.vercel.app; the production app remains a testnet interface and does not imply mainnet availability.",
     "Challenge and response adversarial semantics are covered by the local Direct, mutation, and GLSim gates; the live proof uses the uncontested FIXED path.",
     "The native EOA settlement was independently reconciled by exact balance movement; Bradbury did not expose a separate native transfer transaction hash through this RPC."
   ],

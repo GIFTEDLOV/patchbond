@@ -84,6 +84,8 @@ finalization. The fixture is `GIFTEDLOV/commitgate`, from base commit
 `fixtures/release_guard.py`. This is Bradbury testnet proof, not mainnet
 deployment.
 
+The live frontend is deployed at <https://patchbond.vercel.app>.
+
 ## Security/trust model
 
 Participants never supply evidence URLs. The contract constructs only `https://api.github.com/repos/{owner}/{repo}/...` URLs from immutable validated terms. GitHub repository/commit provenance is verified before semantic use. Challenge evidence is authenticated to the same repository and commit lineage but remains untrusted participant-authored content until adjudicated. Frontends and backends have no verdict, challenge-persuasion, entitlement, refund, or payout authority.
@@ -111,9 +113,8 @@ See [docs/security-model.md](docs/security-model.md) for the Stage 2 adversarial
 - A case that never reaches provisional `FIXED` remains funded in V1; there is intentionally no unilateral cancellation or refund path.
 - External transfers must be reconciled after transaction finality and successful execution.
 - GLSim is production-shaped, not a full GenVM or live-network compatibility claim; its 0.29.2 rollback inspection limitation is documented.
-- The Bradbury contract address is configured in the public frontend example;
-  the dedicated Vercel production deployment is still pending because no
-  authenticated Vercel account is configured in this environment.
+- The Bradbury contract address and public RPC configuration are deployed in the
+  public frontend; Bradbury remains a testnet network.
 
 ## Developer/API detail
 
