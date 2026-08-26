@@ -17,14 +17,36 @@ import { TechnicalDetails } from "./technical-details";
 import { TransactionStatusCard } from "./transaction-status";
 import { WalletControl, useWallet } from "./wallet";
 
-const STATUS_COPY: Record<CaseRecord["status"], { title: string; note: string }> = {
-  OPEN: { title: "Awaiting developer", note: "The bounty is funded. The named developer can inspect and accept these immutable terms." },
-  ACCEPTED: { title: "Developer accepted", note: "The developer can submit an exact patch commit for validator review." },
-  PROVISIONAL_FIXED: { title: "Fix provisionally approved", note: "Authenticated patch evidence satisfied the criteria. Settlement waits through the challenge window." },
-  CHALLENGED: { title: "Developer response due", note: "A repository-bound challenge is registered. The developer retains the full response window." },
-  FINALIZED_DEVELOPER: { title: "Fix approved", note: "Developer settlement is authorized in the finalized case state." },
-  FINALIZED_CLIENT: { title: "Client refund authorized", note: "The case resolved to the client and the original bounty is authorized for refund." },
+const STATUS_COPY: Record<CaseRecord["status"], { title: string; note: string; eyebrow: string }> = {
+  OPEN: { eyebrow: "Funded case", title: "Awaiting developer", note: "The bounty is funded. The named developer can inspect and accept these immutable terms." },
+  ACCEPTED: { eyebrow: "Terms accepted", title: "Developer accepted", note: "The developer can submit an exact patch commit for validator review." },
+  PROVISIONAL_FIXED: { eyebrow: "Decision reached", title: "Fix provisionally approved", note: "Authenticated patch evidence satisfied the criteria. Settlement waits through the challenge window." },
+  CHALLENGED: { eyebrow: "Challenge active", title: "Developer response due", note: "A repository-bound challenge is registered. The developer retains the full response window." },
+  FINALIZED_DEVELOPER: { eyebrow: "Final outcome", title: "Fix approved", note: "Developer settlement is authorized in the finalized case state." },
+  FINALIZED_CLIENT: { eyebrow: "Final outcome", title: "Client refund authorized", note: "The case resolved to the client and the original bounty is authorized for refund." },
 };
+
+const LIFECYCLE = [
+  ["OPEN", "Funded"],
+  ["ACCEPTED", "Accepted"],
+  ["PATCH", "Patch submitted"],
+  ["PROVISIONAL_FIXED", "Under review"],
+  ["CHALLENGE", "Challenge window"],
+  ["FINAL", "Settled"],
+] as const;
+
+function lifecycleIndex(status: CaseRecord["status"]): number {
+  if (status === "OPEN") return 0;
+  if (status === "ACCEPTED") return 1;
+  if (status === "PROVISIONAL_FIXED") return 3;
+  if (status === "CHALLENGED") return 4;
+  return 5;
+}
+
+function LifecycleRail({ status }: { status: CaseRecord["status"] }) {
+  const current = lifecycleIndex(status);
+  return <ol className="lifecycle-rail" aria-label="Case lifecycle">{LIFECYCLE.map(([key, label], index) => <li key={key} className={index < current ? "complete" : index === current ? "current" : ""}><span aria-hidden="true">{index < current ? "✓" : String(index + 1).padStart(2, "0")}</span><small>{label}</small></li>)}</ol>;
+}
 
 function ExactValue({ value }: { value: string }) { return <code className="breakable" title={value}>{shortHash(value)}</code>; }
 
@@ -33,9 +55,9 @@ export function StatusSummary({ caseRecord, nowSeconds }: { caseRecord: CaseReco
   const deadline = caseRecord.status === "PROVISIONAL_FIXED" ? caseRecord.challenge_deadline : caseRecord.status === "CHALLENGED" ? caseRecord.response_deadline : 0;
   return (
     <section className={`status-banner status-${caseRecord.status.toLowerCase()}`}>
-      <div><p className="kicker">Current case status</p><h2>{copy.title}</h2><p>{copy.note}</p></div>
+      <div className="status-copy"><p className="kicker">{copy.eyebrow}</p><h2>{copy.title}</h2><p>{copy.note}</p></div>
       {deadline > 0 && <div className="deadline-card"><span>{caseRecord.status === "PROVISIONAL_FIXED" ? "Challenge deadline" : "Response deadline"}</span><strong>{countdown(deadline, nowSeconds)}</strong><small>{formatDeadline(deadline)}</small></div>}
-      {caseRecord.status.startsWith("FINALIZED") && <div className="settled-stamp"><span>Finalized</span><strong>{caseRecord.settlement_status === "AUTHORIZED_FINALIZED_ONLY" ? "Settlement authorized" : "Reconciliation required"}</strong></div>}
+      {caseRecord.status.startsWith("FINALIZED") && <div className="settled-stamp"><span>Finality confirmed</span><strong>{caseRecord.settlement_status === "AUTHORIZED_FINALIZED_ONLY" ? "Settlement authorized" : "Reconciliation required"}</strong><small>Stored state: {caseRecord.status}</small></div>}
     </section>
   );
 }
@@ -46,7 +68,7 @@ export function CaseFacts({ caseRecord }: { caseRecord: CaseRecord }) {
     <section className="case-facts" aria-labelledby="terms-title">
       <div className="section-line"><div><p className="kicker">Immutable terms</p><h2 id="terms-title">What the bounty requires</h2></div><strong className="bounty">{formatGen(caseRecord.bounty_amount)}</strong></div>
       <dl className="fact-grid">
-        <div><dt>Repository</dt><dd>{caseRecord.repo_owner}/{caseRecord.repo_name}</dd></div>
+        <div><dt>Repository</dt><dd><span className="fact-icon">⌘</span>{caseRecord.repo_owner}/{caseRecord.repo_name}</dd></div>
         <div><dt>Base commit</dt><dd>{baseUrl ? <a href={baseUrl} target="_blank" rel="noopener noreferrer"><ExactValue value={caseRecord.base_commit_sha} /> <span aria-hidden="true">↗</span></a> : <ExactValue value={caseRecord.base_commit_sha} />}</dd></div>
         <div><dt>Developer</dt><dd><ExactValue value={caseRecord.developer_address} /></dd></div>
         <div><dt>Client</dt><dd><ExactValue value={caseRecord.client_address} /></dd></div>
@@ -59,24 +81,13 @@ export function CaseFacts({ caseRecord }: { caseRecord: CaseRecord }) {
 
 function SubmissionHistory({ caseRecord, submissions }: { caseRecord: CaseRecord; submissions: SubmissionRecord[] }) {
   if (!submissions.length) return <div className="empty-inline">No patch has been submitted.</div>;
-  return (
-    <ol className="submission-list">
-      {submissions.map((submission, index) => {
-        const commitUrl = githubCommitUrl(caseRecord.repo_owner, caseRecord.repo_name, submission.patch_commit_sha);
-        return <li key={submission.submission_id}><span className="submission-index">{index + 1}</span><div><strong>{submission.verdict === "FIXED" ? "Fix demonstrated" : submission.verdict === "NOT_FIXED" ? "Criteria not satisfied" : "Assessment inconclusive"}</strong><span>{commitUrl ? <a href={commitUrl} target="_blank" rel="noopener noreferrer"><ExactValue value={submission.patch_commit_sha} /> ↗</a> : <ExactValue value={submission.patch_commit_sha} />}</span></div><span className={`verdict verdict-${submission.verdict.toLowerCase()}`}>{submission.verdict.replace("_", " ")}</span></li>;
-      })}
-    </ol>
-  );
+  return <ol className="submission-list">{submissions.map((submission, index) => {
+    const commitUrl = githubCommitUrl(caseRecord.repo_owner, caseRecord.repo_name, submission.patch_commit_sha);
+    return <li key={submission.submission_id}><span className="submission-index">{String(index + 1).padStart(2, "0")}</span><div><strong>{submission.verdict === "FIXED" ? "Fix demonstrated" : submission.verdict === "NOT_FIXED" ? "Criteria not satisfied" : "Assessment inconclusive"}</strong><span>{commitUrl ? <a href={commitUrl} target="_blank" rel="noopener noreferrer"><ExactValue value={submission.patch_commit_sha} /> ↗</a> : <ExactValue value={submission.patch_commit_sha} />}</span></div><span className={`verdict verdict-${submission.verdict.toLowerCase()}`}>{submission.verdict.replace("_", " ")}</span></li>;
+  })}</ol>;
 }
 
-interface ActionExecution {
-  method: WriteMethod;
-  args: CalldataEncodable[];
-  expected: ExpectedTransition;
-  expectedStatus: CaseRecord["status"];
-  role?: "client" | "developer";
-  deadline?: number;
-}
+interface ActionExecution { method: WriteMethod; args: CalldataEncodable[]; expected: ExpectedTransition; expectedStatus: CaseRecord["status"]; role?: "client" | "developer"; deadline?: number; }
 
 function ActionPanel({ caseRecord, nowSeconds, onReload }: { caseRecord: CaseRecord; nowSeconds: number; onReload(): Promise<void> }) {
   const wallet = useWallet();
@@ -105,9 +116,9 @@ function ActionPanel({ caseRecord, nowSeconds, onReload }: { caseRecord: CaseRec
     } catch (error) { setInputError(error instanceof Error ? error.message : "Action failed"); }
   };
 
-  if (!wallet.address) return <section className="action-panel"><p className="kicker">Current action</p><h2>Connect to continue</h2><p>PatchBond rereads the contract and checks the caller before every write.</p><WalletControl /></section>;
-  if (!wallet.networkMatches) return <section className="action-panel"><p className="kicker">Network mismatch</p><h2>Switch to Bradbury</h2><p>No transaction can be broadcast from the current wallet network.</p><WalletControl /></section>;
-  if (!actions.length) return <section className="action-panel action-muted"><p className="kicker">Current action</p><h2>No action for this wallet</h2><p>The contract state and connected role do not permit a write right now.</p><WalletControl /></section>;
+  if (!wallet.address) return <section className="action-panel"><p className="kicker">Next action</p><h2>Connect to continue</h2><p>PatchBond rereads the contract and checks the caller before every write.</p><WalletControl /></section>;
+  if (!wallet.networkMatches) return <section className="action-panel"><p className="kicker">Wallet check</p><h2>Switch to Bradbury</h2><p>No transaction can be broadcast from the current wallet network.</p><WalletControl /></section>;
+  if (!actions.length) return <section className="action-panel action-muted"><p className="kicker">No write available</p><h2>Nothing to sign right now</h2><p>The contract state and connected role do not permit a write right now.</p><WalletControl /></section>;
 
   const action = actions[0];
   const isShaAction = ["SUBMIT_PATCH", "CHALLENGE", "RESPOND"].includes(action);
@@ -138,16 +149,14 @@ function ActionPanel({ caseRecord, nowSeconds, onReload }: { caseRecord: CaseRec
     REFUND: ["Authorize refund", "Authorize client refund", "The guaranteed response window has closed without a terminal response."],
   };
   const [button, title, note] = actionCopy[action];
-  return (
-    <section className="action-panel"><p className="kicker">Current action</p><h2>{title}</h2><p>{note}</p><form onSubmit={submit} noValidate>
-      {isShaAction && <label>{action === "CHALLENGE" ? "Challenge commit SHA" : action === "RESPOND" ? "Response patch SHA" : "Patch commit SHA"}<input className="mono" value={sha} onChange={(event) => { setSha(event.target.value); setInputError(""); }} placeholder="40 lowercase hexadecimal characters" /></label>}
-      {action === "CHALLENGE" && <label>Challenge path<input className="mono" value={challengePath} onChange={(event) => { setChallengePath(event.target.value); setInputError(""); }} /><span className="field-help">Must be a committed .txt, .md, or .json file under .patchbond/challenges/ in the same repository.</span></label>}
-      {inputError && <p className="field-error" role="alert">{inputError}</p>}
-      {tx.failure && <div className="failure-panel" role="alert"><strong>{tx.failure.title}</strong><p>{tx.failure.message}</p></div>}
-      {tx.record && <TransactionStatusCard record={tx.record} />}
-      <button className="button button-primary" type="submit" disabled={tx.busy || tx.record?.stage === "Complete"}>{tx.busy ? "Reconciling transaction…" : button}</button>
-    </form></section>
-  );
+  return <section className="action-panel"><div className="action-heading"><div><p className="kicker">Next action / wallet authorized</p><h2>{title}</h2></div><span className="action-code">{action}</span></div><p>{note}</p><form onSubmit={submit} noValidate>
+    {isShaAction && <label>{action === "CHALLENGE" ? "Challenge commit SHA" : action === "RESPOND" ? "Response patch SHA" : "Patch commit SHA"}<input className="mono" value={sha} onChange={(event) => { setSha(event.target.value); setInputError(""); }} placeholder="40 lowercase hexadecimal characters" autoComplete="off" /></label>}
+    {action === "CHALLENGE" && <label>Challenge path<input className="mono" value={challengePath} onChange={(event) => { setChallengePath(event.target.value); setInputError(""); }} autoComplete="off" /><span className="field-help">Must be a committed .txt, .md, or .json file under .patchbond/challenges/ in the same repository.</span></label>}
+    {inputError && <p className="field-error" role="alert">{inputError}</p>}
+    {tx.failure && <div className="failure-panel" role="alert"><strong>{tx.failure.title}</strong><p>{tx.failure.message}</p></div>}
+    {tx.record && <TransactionStatusCard record={tx.record} />}
+    <button className="button button-primary" type="submit" disabled={tx.busy || tx.record?.stage === "Complete"}>{tx.busy ? "Reconciling transaction..." : button} <span aria-hidden="true">-&gt;</span></button>
+  </form></section>;
 }
 
 function CaseTechnicalDetails({ caseRecord, submissions }: { caseRecord: CaseRecord; submissions: SubmissionRecord[] }) {
@@ -155,17 +164,17 @@ function CaseTechnicalDetails({ caseRecord, submissions }: { caseRecord: CaseRec
 }
 
 export function VerificationView({ caseRecord, submissions, nowSeconds }: { caseRecord: CaseRecord; submissions: SubmissionRecord[]; nowSeconds: number }) {
-  return (
-    <>
-      <StatusSummary caseRecord={caseRecord} nowSeconds={nowSeconds} />
-      <CaseFacts caseRecord={caseRecord} />
-      <section className="audit-section"><div className="section-line"><div><p className="kicker">Public audit</p><h2>Patch and verdict history</h2></div></div><SubmissionHistory caseRecord={caseRecord} submissions={submissions} />
-        {caseRecord.challenge_commit_sha && <div className="challenge-record"><h3>Challenge registered</h3><dl><div><dt>Commit</dt><dd><ExactValue value={caseRecord.challenge_commit_sha} /></dd></div><div><dt>Path</dt><dd><code>{caseRecord.challenge_path}</code></dd></div><div><dt>Evidence digest</dt><dd><ExactValue value={caseRecord.challenge_evidence_digest} /></dd></div></dl></div>}
-      </section>
-      <section className="trust-statement"><strong>What consensus proves</strong><p>Consensus proves validator agreement about interpretation. Repository and commit provenance are verified before semantic evaluation; consensus itself does not authenticate evidence.</p></section>
-      <CaseTechnicalDetails caseRecord={caseRecord} submissions={submissions} />
-    </>
-  );
+  return <>
+    <div className="verification-certificate"><span className="verification-certificate-mark">✓</span><div><p className="kicker">Public verification certificate</p><h2>Read the result without a wallet.</h2><p>PatchBond separates authenticated repository evidence, validator interpretation, consensus, finality, and settlement consequence.</p></div></div>
+    <StatusSummary caseRecord={caseRecord} nowSeconds={nowSeconds} />
+    <LifecycleRail status={caseRecord.status} />
+    <CaseFacts caseRecord={caseRecord} />
+    <section className="audit-section"><div className="section-line"><div><p className="kicker">Public audit</p><h2>Patch and verdict history</h2></div><span className="section-index">READ ONLY</span></div><SubmissionHistory caseRecord={caseRecord} submissions={submissions} />
+      {caseRecord.challenge_commit_sha && <div className="challenge-record"><h3>Challenge registered</h3><dl><div><dt>Commit</dt><dd><ExactValue value={caseRecord.challenge_commit_sha} /></dd></div><div><dt>Path</dt><dd><code>{caseRecord.challenge_path}</code></dd></div><div><dt>Evidence digest</dt><dd><ExactValue value={caseRecord.challenge_evidence_digest} /></dd></div></dl></div>}
+    </section>
+    <section className="trust-statement"><strong>What consensus proves</strong><p>Consensus proves validator agreement about interpretation. Repository and commit provenance are verified before semantic evaluation; consensus itself does not authenticate evidence.</p></section>
+    <CaseTechnicalDetails caseRecord={caseRecord} submissions={submissions} />
+  </>;
 }
 
 export function CaseScreen({ caseId, verify = false }: { caseId: string; verify?: boolean }) {
@@ -192,5 +201,5 @@ export function CaseScreen({ caseId, verify = false }: { caseId: string; verify?
   if (loading) return <div className="page-shell"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-panel" /></div>;
   if (error || !caseRecord) return <div className="page-shell narrow"><LiveContractNotice /><div className="empty-state"><p className="kicker">Case unavailable</p><h1>No authoritative case state loaded.</h1><p>{error}</p><button className="button button-secondary" type="button" onClick={() => void load()}>Try read again</button></div></div>;
 
-  return <div className="case-shell"><header className="case-heading"><div><p className="kicker">PatchBond case</p><h1>{caseRecord.case_id}</h1><p>{caseRecord.repo_owner}/{caseRecord.repo_name}</p></div>{!verify && <Link className="text-link" href={`/verify/${encodeURIComponent(caseRecord.case_id)}`}>Public verification view ↗</Link>}</header>{verify ? <VerificationView caseRecord={caseRecord} submissions={submissions} nowSeconds={now} /> : <><StatusSummary caseRecord={caseRecord} nowSeconds={now} /><CaseFacts caseRecord={caseRecord} /><ActionPanel caseRecord={caseRecord} nowSeconds={now} onReload={load} /><section className="audit-section compact-section"><p className="kicker">Assessment history</p><SubmissionHistory caseRecord={caseRecord} submissions={submissions} /></section><CaseTechnicalDetails caseRecord={caseRecord} submissions={submissions} /></>}</div>;
+  return <div className={`case-shell ${verify ? "verification-page" : ""}`}><header className="case-heading"><div><p className="kicker">{verify ? "Public verification" : "PatchBond case"}</p><h1>{caseRecord.case_id}</h1><p>{caseRecord.repo_owner}/{caseRecord.repo_name}</p></div>{!verify && <Link className="text-link" href={`/verify/${encodeURIComponent(caseRecord.case_id)}`}>Public verification view ↗</Link>}</header>{verify ? <VerificationView caseRecord={caseRecord} submissions={submissions} nowSeconds={now} /> : <><StatusSummary caseRecord={caseRecord} nowSeconds={now} /><LifecycleRail status={caseRecord.status} /><CaseFacts caseRecord={caseRecord} /><ActionPanel caseRecord={caseRecord} nowSeconds={now} onReload={load} /><section className="audit-section compact-section"><p className="kicker">Assessment history</p><SubmissionHistory caseRecord={caseRecord} submissions={submissions} /></section><CaseTechnicalDetails caseRecord={caseRecord} submissions={submissions} /></>}</div>;
 }

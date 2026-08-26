@@ -18,7 +18,7 @@ const initialDraft: CaseDraft = {
 export function ImmutableTermReview({ draft }: { draft: CaseDraft }) {
   return (
     <div className="review-sheet" aria-label="Immutable case review">
-      <div className="review-head"><span>Repository</span><strong>{draft.repoOwner}/{draft.repoName}</strong></div>
+      <div className="review-head"><span>Immutable agreement</span><strong>{draft.repoOwner}/{draft.repoName}</strong></div>
       <dl>
         <div><dt>Case ID</dt><dd>{draft.caseId}</dd></div>
         <div><dt>Base commit</dt><dd className="mono breakable">{draft.baseCommitSha}</dd></div>
@@ -78,7 +78,7 @@ export function CreateCaseForm() {
 
   if (reviewing) return (
     <div className="flow-stack">
-      <div className="page-intro compact"><p className="kicker">Final review</p><h1>These terms become immutable.</h1><p>Broadcasting locks the bounty and every term below. A material change requires a new case.</p></div>
+      <div className="page-intro compact"><p className="kicker">Final review / 02</p><h1>These terms become immutable.</h1><p>Broadcasting locks the bounty and every term below. A material change requires a new case.</p></div>
       <ImmutableTermReview draft={draft} />
       <LiveContractNotice />
       <WalletControl />
@@ -88,35 +88,35 @@ export function CreateCaseForm() {
       <div className="form-actions">
         <button type="button" className="button button-secondary" onClick={() => { setReviewing(false); setConfirmed(false); }} disabled={tx.busy}>Edit terms</button>
         <button type="button" className="button button-primary" onClick={() => void broadcast()} disabled={!confirmed || !wallet.address || !wallet.networkMatches || !config.configured || tx.busy || tx.record?.stage === "Complete"}>
-          {tx.busy ? "Reconciling transaction…" : `Fund ${draft.bountyGen} GEN and create case`}
+          {tx.busy ? "Reconciling transaction..." : `Fund ${draft.bountyGen} GEN and create case`}
         </button>
       </div>
-      {tx.record?.stage === "Complete" && <Link className="button button-primary" href={`/cases/${encodeURIComponent(draft.caseId)}`}>Open funded case →</Link>}
+      {tx.record?.stage === "Complete" && <Link className="button button-primary" href={`/cases/${encodeURIComponent(draft.caseId)}`}>Open funded case -&gt;</Link>}
     </div>
   );
 
   return (
     <form className="case-form" onSubmit={review} noValidate>
-      <fieldset><legend>Identity and repository</legend>
+      <fieldset><legend>Identity and repository</legend><p className="form-section-note">Start with the exact source of truth. PatchBond binds this revision before any developer work begins.</p>
         <div className="form-grid">
-          <label>Case ID<input value={draft.caseId} onChange={(event) => set("caseId", event.target.value)} placeholder="openssl-cve-2026" /><FieldError value={errors.caseId} /></label>
-          <label>Developer wallet address<input className="mono" value={draft.developerAddress} onChange={(event) => set("developerAddress", event.target.value)} placeholder="0x…" /><FieldError value={errors.developerAddress} /></label>
-          <label>GitHub owner<input value={draft.repoOwner} onChange={(event) => set("repoOwner", event.target.value)} placeholder="organization" /><FieldError value={errors.repoOwner} /></label>
-          <label>GitHub repository<input value={draft.repoName} onChange={(event) => set("repoName", event.target.value)} placeholder="repository" /><FieldError value={errors.repoName} /></label>
-          <label className="span-2">Base commit SHA<input className="mono" value={draft.baseCommitSha} onChange={(event) => set("baseCommitSha", event.target.value)} placeholder="40 lowercase hexadecimal characters" /><FieldError value={errors.baseCommitSha} /></label>
+          <label>Case ID<input value={draft.caseId} onChange={(event) => set("caseId", event.target.value)} placeholder="openssl-cve-2026" autoComplete="off" /><FieldError value={errors.caseId} /></label>
+          <label>Developer wallet address<input className="mono" value={draft.developerAddress} onChange={(event) => set("developerAddress", event.target.value)} placeholder="0x..." autoComplete="off" /><FieldError value={errors.developerAddress} /></label>
+          <label>GitHub owner<input value={draft.repoOwner} onChange={(event) => set("repoOwner", event.target.value)} placeholder="organization" autoComplete="off" /><FieldError value={errors.repoOwner} /></label>
+          <label>GitHub repository<input value={draft.repoName} onChange={(event) => set("repoName", event.target.value)} placeholder="repository" autoComplete="off" /><FieldError value={errors.repoName} /></label>
+          <label className="span-2">Base commit SHA<input className="mono" value={draft.baseCommitSha} onChange={(event) => set("baseCommitSha", event.target.value)} placeholder="40 lowercase hexadecimal characters" autoComplete="off" /><FieldError value={errors.baseCommitSha} /></label>
         </div>
       </fieldset>
-      <fieldset><legend>Remediation terms</legend>
+      <fieldset><legend>Remediation brief</legend><p className="form-section-note">Describe the security requirement in language a reviewer can test against the committed source.</p>
         <label>Vulnerability specification<textarea rows={6} value={draft.vulnerabilitySpec} onChange={(event) => set("vulnerabilitySpec", event.target.value)} placeholder="Describe the exact vulnerability at the committed base revision." /><span className="char-count">{draft.vulnerabilitySpec.length}/4,000</span><FieldError value={errors.vulnerabilitySpec} /></label>
         <label>Acceptance criteria<textarea rows={6} value={draft.acceptanceCriteria} onChange={(event) => set("acceptanceCriteria", event.target.value)} placeholder="State the bounded, observable remediation requirements." /><span className="char-count">{draft.acceptanceCriteria.length}/4,000</span><FieldError value={errors.acceptanceCriteria} /></label>
-        <div className="path-editor"><span className="field-label">Review paths (1–4)</span>{draft.reviewPaths.map((path, index) => <div className="path-row" key={index}><input aria-label={`Review path ${index + 1}`} className="mono" value={path} onChange={(event) => set("reviewPaths", draft.reviewPaths.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder="src/security/auth.py" />{draft.reviewPaths.length > 1 && <button type="button" className="icon-button" aria-label={`Remove review path ${index + 1}`} onClick={() => set("reviewPaths", draft.reviewPaths.filter((_, itemIndex) => itemIndex !== index))}>×</button>}</div>)}{draft.reviewPaths.length < 4 && <button className="text-button" type="button" onClick={() => set("reviewPaths", [...draft.reviewPaths, ""])}>+ Add review path</button>}<FieldError value={errors.reviewPaths} /></div>
+        <div className="path-editor"><span className="field-label">Review paths (1-4)</span>{draft.reviewPaths.map((path, index) => <div className="path-row" key={index}><input aria-label={`Review path ${index + 1}`} className="mono" value={path} onChange={(event) => set("reviewPaths", draft.reviewPaths.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder="src/security/auth.py" />{draft.reviewPaths.length > 1 && <button type="button" className="icon-button" aria-label={`Remove review path ${index + 1}`} onClick={() => set("reviewPaths", draft.reviewPaths.filter((_, itemIndex) => itemIndex !== index))}>x</button>}</div>)}{draft.reviewPaths.length < 4 && <button className="text-button" type="button" onClick={() => set("reviewPaths", [...draft.reviewPaths, ""])}>+ Add review path</button>}<FieldError value={errors.reviewPaths} /></div>
       </fieldset>
-      <fieldset><legend>Escrow and timing</legend><div className="form-grid">
+      <fieldset><legend>Escrow and timing</legend><p className="form-section-note">The bounty and challenge window define the economic boundary of the review.</p><div className="form-grid">
         <label>Bounty amount in GEN<input inputMode="decimal" value={draft.bountyGen} onChange={(event) => set("bountyGen", event.target.value)} placeholder="25" /><span className="field-help">Locked when the case is created.</span><FieldError value={errors.bountyGen} /></label>
         <label>Challenge duration<select value={draft.challengeWindowSeconds} onChange={(event) => set("challengeWindowSeconds", Number(event.target.value))}><option value={3_600}>1 hour</option><option value={21_600}>6 hours</option><option value={86_400}>24 hours</option><option value={259_200}>3 days</option><option value={604_800}>7 days</option></select><FieldError value={errors.challengeWindowSeconds} /></label>
       </div></fieldset>
-      <div className="immutability-note"><strong>Review before broadcast</strong><p>The repository, base commit, developer, specifications, paths, challenge duration, and bounty cannot be edited after creation.</p></div>
-      <button className="button button-primary" type="submit">Review immutable terms <span aria-hidden="true">→</span></button>
+      <div className="immutability-note"><div><strong>Review before broadcast</strong><p>The repository, base commit, developer, specifications, paths, challenge duration, and bounty cannot be edited after creation.</p></div></div>
+      <button className="button button-primary" type="submit">Review immutable terms <span aria-hidden="true">-&gt;</span></button>
     </form>
   );
 }
