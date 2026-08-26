@@ -35,7 +35,7 @@ export function StatusSummary({ caseRecord, nowSeconds }: { caseRecord: CaseReco
     <section className={`status-banner status-${caseRecord.status.toLowerCase()}`}>
       <div><p className="kicker">Current case status</p><h2>{copy.title}</h2><p>{copy.note}</p></div>
       {deadline > 0 && <div className="deadline-card"><span>{caseRecord.status === "PROVISIONAL_FIXED" ? "Challenge deadline" : "Response deadline"}</span><strong>{countdown(deadline, nowSeconds)}</strong><small>{formatDeadline(deadline)}</small></div>}
-      {caseRecord.status.startsWith("FINALIZED") && <div className="settled-stamp"><span>Finalized</span><strong>{caseRecord.settlement_status === "AUTHORIZED_FINALIZED_ONLY" ? "Payment settled" : "Reconciliation required"}</strong></div>}
+      {caseRecord.status.startsWith("FINALIZED") && <div className="settled-stamp"><span>Finalized</span><strong>{caseRecord.settlement_status === "AUTHORIZED_FINALIZED_ONLY" ? "Settlement authorized" : "Reconciliation required"}</strong></div>}
     </section>
   );
 }

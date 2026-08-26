@@ -21,7 +21,7 @@ describe("public verify rendering", () => {
     expect(screen.getByText("25 GEN")).toBeInTheDocument();
     expect(screen.getByText("Fix demonstrated")).toBeInTheDocument();
     expect(screen.getByText(/Consensus proves validator agreement about interpretation/)).toBeInTheDocument();
-    expect(screen.getByText("Payment settled")).toBeInTheDocument();
+    expect(screen.getByText("Settlement authorized")).toBeInTheDocument();
   });
 
   it("keeps exact identifiers in a collapsed technical-details section", () => {

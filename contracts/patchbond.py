@@ -380,7 +380,11 @@ class PatchBondEscrow(gl.Contract):
         if type(size) is not int or size < 0 or size > max_bytes or type(encoded) is not str:
             raise gl.vm.UserError("EVIDENCE_FAILURE: CONTENT_SIZE")
         try:
-            content = base64.b64decode(encoded, validate=True)
+            # GitHub's Contents API may wrap otherwise valid base64 with
+            # ASCII whitespace. Remove only transport whitespace, then keep
+            # strict alphabet/padding validation and the Git blob check.
+            compact_encoded = encoded.replace(" ", "").replace("\t", "").replace("\r", "").replace("\n", "")
+            content = base64.b64decode(compact_encoded, validate=True)
             text = content.decode("utf-8")
         except Exception:
             raise gl.vm.UserError("EVIDENCE_FAILURE: CONTENT_NOT_TEXT")
