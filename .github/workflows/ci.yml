@@ -109,4 +109,5 @@ jobs:
         shell: bash
         run: |
           git diff --check
+          git status --short
           test -z "$(git status --porcelain)"
