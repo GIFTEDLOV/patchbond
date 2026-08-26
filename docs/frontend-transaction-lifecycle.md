@@ -18,7 +18,10 @@ Every write follows this sequence:
 6. Read the case again and verify the expected status, changed submission ID
    where applicable, and settlement recipient, amount, and authorization for a
    terminal settlement.
-7. Mark the record `Complete` only after all of those checks pass.
+7. For an EOA settlement, reconcile the external finalized value transfer (or
+   report that authorization is on-chain but transfer completion is not yet
+   independently confirmed).
+8. Mark the record `Complete` only after all of those checks pass.
 
 ## Refresh and browser restart recovery
 

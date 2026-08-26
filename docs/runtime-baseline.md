@@ -1,6 +1,6 @@
 # PatchBond runtime baseline
 
-Verified on 2026-08-25 before implementation. No package was upgraded.
+Verified on 2026-08-26 for the final release candidate. No package was upgraded.
 
 ## Installed tooling
 
@@ -11,7 +11,7 @@ Verified on 2026-08-25 before implementation. No package was upgraded.
 | `genlayer-py` | `0.16.3` | Kept |
 | `genlayer-test` | `0.29.2` | Kept |
 | Python | 3.14 runtime | Kept |
-| CLI active network | `testnet-bradbury` | Read-only inspection only; no deployment |
+| CLI active network | `testnet-bradbury` | Bradbury runtime preflight and release proof |
 
 The contract dependency is pinned to the current official documentation value:
 
@@ -59,9 +59,21 @@ PatchBond uses the repository, commit, compare, and contents endpoints. It valid
 
 Not used for V1. The exact-commit public check-runs probe did not complete reliably in this environment, check state can be transient/paginated, anonymous GitHub API capacity is only 60 requests/hour, and no Bradbury web-access probe has been run. The manifest records `{"decision":"NOT_USED"}`. Source and lineage evidence remain authoritative.
 
-## Compatibility claim
+## Bradbury compatibility and release proof
 
-Bradbury compatibility is **not claimed**. No key was accessed and nothing was deployed. Direct execution and local lint/validation results are reported separately from live-network proof.
+The exact contract dependency was preflighted on the current Bradbury runtime
+using a custom V6 `addTransaction` call because the legacy CLI's deployment
+path was not compatible with the current network fee-manager surface. A probe
+using the exact dependency finalized with `FINISHED_WITH_RETURN` and five
+`AGREE` votes. The corrected PatchBond source then finalized at Bradbury
+contract `0x31fAeeb4C21fBDceeE2EF77BF75145ABC7931834` with
+`FINISHED_WITH_RETURN` and `MAJORITY_AGREE`. The deployed source digest is
+`910c386667333ebc9bc88b58031889c24b406063e6087deb6e8f6f77eacccbf3`.
+
+The exact runner hash is compatible with Bradbury; no runtime port was
+required. Direct execution and local lint/validation remain separate local
+gates, while the live deployment and representative case in
+`artifacts/final-release-proof.json` establish the current Bradbury evidence.
 
 ## Stage 2 local consensus baseline
 

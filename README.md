@@ -67,11 +67,37 @@ Public writes are `create_case`, `accept_case`, `submit_patch`, `challenge`, `re
 
 ## Live proof
 
-**NOT COMPLETED on Bradbury at this stage.** No private key was accessed, and no deployment was attempted.
+The production-like Bradbury testnet proof uses contract
+`0x31fAeeb4C21fBDceeE2EF77BF75145ABC7931834` and representative case
+`stage4-commitgate-20260826d`. The semantic assessment is transaction
+`0xa2526faace86584e090feb6e67bf0a039e46c973984fc027682c0c173bc8e37b`,
+`FINALIZED` with successful execution and stored verdict `FIXED`; its evidence
+manifest digest is
+`e15dc8cf51a65f25e014b93de9631f036ab976e31b27beb51f1072cf95466c7a`.
+The uncontested finalization is
+`0x4ad144ec9b1df874cb4ed7522f2e21aa1934455afc33000fef917b224fbef88c`,
+stored as `FINALIZED_DEVELOPER` with `AUTHORIZED_FINALIZED_ONLY` settlement;
+the developer EOA balance increased by exactly `10000000000000000` wei after
+finalization. The fixture is `GIFTEDLOV/commitgate`, from base commit
+`82a3775101d4815392375d22ff0a71feb62c944b` to patch commit
+`0b552ac0c71367d6389cb9e231a58d11c7f77584`, reviewing
+`fixtures/release_guard.py`. This is Bradbury testnet proof, not mainnet
+deployment.
 
 ## Security/trust model
 
 Participants never supply evidence URLs. The contract constructs only `https://api.github.com/repos/{owner}/{repo}/...` URLs from immutable validated terms. GitHub repository/commit provenance is verified before semantic use. Challenge evidence is authenticated to the same repository and commit lineage but remains untrusted participant-authored content until adjudicated. Frontends and backends have no verdict, challenge-persuasion, entitlement, refund, or payout authority.
+
+The developer cannot substitute arbitrary evidence: PatchBond binds the
+repository and base commit before work, constructs evidence locations itself,
+and verifies exact target commits, ancestry, review paths, file bytes, Git blob
+hashes, and source hashes before semantic evaluation. The stored evidence
+manifest digest commits to the exact repository, commits, paths, and source
+hashes used for adjudication. `FIXED` is provisional, the client receives a
+guaranteed challenge window, and challenge evidence is bound to the same
+repository and commit lineage. Validators independently retrieve and
+adjudicate evidence; they do not merely approve a leader proposal. Consensus
+proves validator agreement about interpretation, not evidence authentication.
 
 See [docs/security.md](docs/security.md) for the complete sequence and bounds.
 See [docs/security-model.md](docs/security-model.md) for the Stage 2 adversarial review and five-validator proof.
@@ -80,12 +106,14 @@ See [docs/security-model.md](docs/security-model.md) for the Stage 2 adversarial
 
 - V1 handles 1–4 bounded review paths; broader changes require a new case design.
 - Public GitHub API availability and anonymous rate limits are external liveness dependencies.
-- CI/check-run evidence is deliberately non-decisive because the probe was not reliable enough and Bradbury access has not been demonstrated.
+- CI/check-run evidence is deliberately non-decisive because the probe was not reliable enough; the separate Bradbury proof uses authenticated repository/commit evidence and finalized contract state.
 - Repository deletion, visibility changes, GitHub outage, model failure, or consensus failure reverts/fails; none becomes a party win.
 - A case that never reaches provisional `FIXED` remains funded in V1; there is intentionally no unilateral cancellation or refund path.
 - External transfers must be reconciled after transaction finality and successful execution.
 - GLSim is production-shaped, not a full GenVM or live-network compatibility claim; its 0.29.2 rollback inspection limitation is documented.
-- The frontend remains disabled for writes until `NEXT_PUBLIC_PATCHBOND_CONTRACT_ADDRESS` is set after the Stage 4 Bradbury deployment.
+- The Bradbury contract address is configured in the public frontend example;
+  the dedicated Vercel production deployment is still pending because no
+  authenticated Vercel account is configured in this environment.
 
 ## Developer/API detail
 
