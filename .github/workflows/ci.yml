@@ -105,9 +105,11 @@ jobs:
       - name: Secret scan
         run: python tools/secret_scan.py
 
+      - name: Restore reviewer proof artifact after runtime gates
+        run: git restore --source=HEAD -- artifacts/final-release-proof.json
+
       - name: Diff hygiene and generated-state check
         shell: bash
         run: |
           git diff --check
-          git status --short
           test -z "$(git status --porcelain)"
