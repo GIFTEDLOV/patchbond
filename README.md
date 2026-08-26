@@ -37,6 +37,8 @@ Consensus proves agreement about interpretation; it does not authenticate eviden
 
 ## Use
 
+The [`frontend`](frontend) is the Next.js public verification view and wallet-based case workflow. Its durable transaction rules are documented in [`docs/frontend-transaction-lifecycle.md`](docs/frontend-transaction-lifecycle.md).
+
 Run the local gates:
 
 ```powershell
@@ -50,11 +52,22 @@ genvm-lint validate contracts/patchbond.py
 git diff --check
 ```
 
+Frontend gates:
+
+```powershell
+cd frontend
+npm ci
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
 Public writes are `create_case`, `accept_case`, `submit_patch`, `challenge`, `respond_to_challenge`, `finalize_uncontested`, and `authorize_client_refund`. Audit views are `get_case`, `get_submission`, and `get_accounting`.
 
 ## Live proof
 
-**NOT YET RUN on Bradbury at this stage.** No private key was accessed, and no deployment was attempted.
+**NOT COMPLETED on Bradbury at this stage.** No private key was accessed, and no deployment was attempted.
 
 ## Security/trust model
 
@@ -72,7 +85,7 @@ See [docs/security-model.md](docs/security-model.md) for the Stage 2 adversarial
 - A case that never reaches provisional `FIXED` remains funded in V1; there is intentionally no unilateral cancellation or refund path.
 - External transfers must be reconciled after transaction finality and successful execution.
 - GLSim is production-shaped, not a full GenVM or live-network compatibility claim; its 0.29.2 rollback inspection limitation is documented.
-- No frontend exists yet.
+- The frontend remains disabled for writes until `NEXT_PUBLIC_PATCHBOND_CONTRACT_ADDRESS` is set after the Stage 4 Bradbury deployment.
 
 ## Developer/API detail
 
