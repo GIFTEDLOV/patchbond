@@ -8,6 +8,8 @@ export function CaseLookup({ verify = false }: { verify?: boolean }) {
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+  const inputId = verify ? "verify-case-id" : "developer-case-id";
+  const errorId = `${verify ? "verify" : "developer"}-case-error`;
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!validateCaseId(caseId)) { setError("Enter the exact lowercase PatchBond case ID."); return; }
@@ -15,12 +17,12 @@ export function CaseLookup({ verify = false }: { verify?: boolean }) {
   };
   return (
     <form className="lookup" onSubmit={submit} noValidate>
-      <label htmlFor={verify ? "verify-case-id" : "developer-case-id"}>Case ID</label>
+      <label htmlFor={inputId}>Case ID</label>
       <div className="lookup-row">
-        <input id={verify ? "verify-case-id" : "developer-case-id"} value={caseId} onChange={(event) => { setCaseId(event.target.value); setError(""); }} placeholder="openssl-cve-2026" autoComplete="off" />
-        <button className="button button-primary" type="submit">{verify ? "Verify case" : "Open case"} <span aria-hidden="true">→</span></button>
+        <input id={inputId} value={caseId} onChange={(event) => { setCaseId(event.target.value); setError(""); }} placeholder="openssl-cve-2026" autoComplete="off" aria-describedby={error ? errorId : undefined} />
+        <button className="button button-primary" type="submit">{verify ? "Verify case" : "Open case"} <span aria-hidden="true">-&gt;</span></button>
       </div>
-      {error && <p className="field-error" role="alert">{error}</p>}
+      {error && <p id={errorId} className="field-error" role="alert">{error}</p>}
     </form>
   );
 }

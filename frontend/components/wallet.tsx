@@ -90,11 +90,11 @@ export function WalletControl() {
     <div className="wallet-control">
       {wallet.address ? (
         <span className={wallet.networkMatches ? "wallet-chip" : "wallet-chip wallet-wrong"}>
-          <span className="status-dot" /> {shortHash(wallet.address)} · {wallet.networkMatches ? "Bradbury" : "Wrong network"}
+          <span className="status-dot" /> {shortHash(wallet.address)} <span aria-hidden="true">/</span> {wallet.networkMatches ? "Bradbury" : "Wrong network"}
         </span>
       ) : (
         <button className="button button-secondary" type="button" onClick={() => void wallet.connect()} disabled={wallet.connecting}>
-          {wallet.connecting ? "Waiting for wallet" : "Connect wallet"}
+          {wallet.connecting ? "Waiting for wallet" : "Connect wallet"} <span aria-hidden="true">-&gt;</span>
         </button>
       )}
       {wallet.error && <p className="inline-error" role="alert">{wallet.error}</p>}
