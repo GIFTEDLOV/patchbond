@@ -4,10 +4,23 @@ import { AppProviders } from "@/components/app-providers";
 import { WalletControl } from "@/components/wallet";
 import "./globals.css";
 
+function resolveSiteUrl(): URL {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+  const candidate = configured ?? (vercelHost ? `https://${vercelHost}` : "http://localhost:3000");
+  try {
+    const url = new URL(candidate);
+    if (url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) return url;
+  } catch {
+    // Local fallback keeps development usable; deployed Vercel builds resolve from VERCEL_URL.
+  }
+  return new URL("http://localhost:3000");
+}
+
 export const metadata: Metadata = {
   title: "PatchBond - funded security remediation",
   description: "Security remediation escrow backed by authenticated code evidence and independent GenLayer adjudication.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: resolveSiteUrl(),
   openGraph: {
     title: "PatchBond - proof before payout",
     description: "Funded security remediation backed by authenticated code evidence.",

@@ -1,5 +1,11 @@
 import { CreateCaseForm } from "@/components/create-case-form";
 
 export default function NewCasePage() {
-  return <div className="page-shell create-page"><header className="page-intro page-intro-split"><div><p className="kicker">Client workflow / 01</p><h1>Fund a security fix.</h1><p>Turn a remediation requirement into a precise escrow agreement. Every term below becomes immutable when the bounty is funded.</p></div><div className="page-aside-note"><span className="aside-number">01</span><strong>Define the boundary.</strong><span>Repository, base revision, authorized developer, and a bounded review scope.</span></div></header><div className="create-layout"><aside className="form-rail" aria-label="Case creation steps"><span className="form-rail-label">New PatchBond</span><ol><li className="active"><b>01</b><span>Terms</span></li><li><b>02</b><span>Review</span></li><li><b>03</b><span>Fund</span></li></ol><div className="form-rail-bottom"><span className="signal-dot" /> Immutable after broadcast</div></aside><CreateCaseForm /></div></div>;
+  return <div className="page-shell app-page create-page">
+    <header className="app-page-header">
+      <div><p className="kicker">Client workspace</p><h1>Fund a security fix</h1><p>Build an immutable remediation agreement. Nothing is broadcast until you review the complete case.</p></div>
+      <div className="page-context"><span className="status-dot" /> Bradbury / client write</div>
+    </header>
+    <CreateCaseForm />
+  </div>;
 }
